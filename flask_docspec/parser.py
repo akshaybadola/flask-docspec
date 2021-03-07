@@ -5,6 +5,8 @@ import re
 import sys
 import warnings
 import pathlib
+import flask
+import werkzeug
 import pydantic
 from pydantic import BaseConfig
 from pydantic.fields import ModelField
@@ -801,7 +803,7 @@ def check_function_redirect(docstr: Optional[str], rulename: str) -> Tuple[str, 
     return var, rest
 
 
-def get_specs_for_path(name: str, rule: 'werkzeug.routing.Rule',
+def get_specs_for_path(name: str, rule: werkzeug.routing.Rule,
                        method_func: Callable, method: str,
                        gen_opid: bool,
                        opid_template: str, aliases: Dict[str, str]) ->\
@@ -914,7 +916,7 @@ def get_specs_for_path(name: str, rule: 'werkzeug.routing.Rule',
     return retval, error
 
 
-def make_paths(app: 'flask.Flask', excludes: List[str],
+def make_paths(app: flask.Flask, excludes: List[str],
                gen_opid: bool, opid_template: str,
                aliases: Dict[str, str]) ->\
         Tuple[Dict, List[Tuple[str, str]], List[str]]:

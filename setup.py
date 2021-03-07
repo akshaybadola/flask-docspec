@@ -42,6 +42,7 @@ setup(
     python_requires=">=3.6, <=3.9",
     install_requires=["pockets==0.9.1",
                       "six==1.15.0",
+                      "Flask==1.1.2",
                       "sphinx==3.5.1",
                       "pydantic @ git+https://github.com/akshaybadola/pydantic.git@master"]
 )
