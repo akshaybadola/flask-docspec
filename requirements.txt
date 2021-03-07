@@ -1,0 +1,7 @@
+pockets==0.9.1
+six==1.15.0
+sphinx==3.5.1
+git+https://github.com/akshaybadola/pydantic.git@master
+# NOTE: For testing uncomment
+# pytest==6.2.1
+# pytest-cov==2.11.1
