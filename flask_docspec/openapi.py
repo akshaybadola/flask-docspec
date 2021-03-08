@@ -1,5 +1,4 @@
 from typing import Union, List, Callable, Dict, Tuple, Optional, Any, Type, Iterable
-import flask
 
 from .util import recurse_dict, pop_if
 
@@ -132,7 +131,7 @@ def fix_yaml_references(spec: str) -> str:
     return "\n".join(splits)
 
 
-def openapi_spec(app: flask.Flask, excludes: List[str] = [],
+def openapi_spec(app: 'flask.Flask', excludes: List[str] = [],
                  gen_opid: bool = False,
                  opid_template: str = "",
                  modules: Dict[str, Any] = {},

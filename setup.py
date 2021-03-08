@@ -39,7 +39,7 @@ setup(
     packages=["flask_docspec"],
     include_package_data=True,
     keywords='documentation openapi',
-    python_requires=">=3.6, <=3.9",
+    python_requires=">=3.7, <=3.9",
     install_requires=["pockets==0.9.1",
                       "six==1.15.0",
                       "Flask==1.1.2",
