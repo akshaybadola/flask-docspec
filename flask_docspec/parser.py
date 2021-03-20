@@ -74,6 +74,22 @@ def resolve_partials(func: Callable) -> Callable:
     return func
 
 
+def exec_importing_module(func_name: str, modname: str) -> Callable:
+    if modname in sys.modules:
+        if "." in modname:
+            func = exec_and_return(".".join([modname.split(".")[-1], func_name]),
+                                   {modname: sys.modules[modname],
+                                    **global_modules, **globals()})
+            return func
+        else:
+            func = exec_and_return(".".join([modname, func_name]),
+                                   {modname: sys.modules[modname],
+                                    **global_modules, **globals()})
+            return func
+    else:
+        raise AttributeError()
+
+
 def get_func_for_redirect(func_name: str, redirect_from: Callable) -> Optional[Callable]:
     """Get the function with name `func_name` from context of `redirect_from`.
 
@@ -102,17 +118,7 @@ def get_func_for_redirect(func_name: str, redirect_from: Callable) -> Optional[C
     try:
         modname = redirect_from.__module__
         exec(f"import {modname}")
-        if modname in sys.modules:
-            if "." in modname:
-                func = exec_and_return(".".join([modname.split(".")[-1], func_name]),
-                                       {modname: sys.modules[modname],
-                                        **global_modules, **globals()})
-                return func
-            else:
-                func = exec_and_return(".".join([redirect_from.__module__, func_name]),
-                                       {modname: sys.modules[modname],
-                                        **global_modules, **globals()})
-                return func
+        func = exec_importing_module(func_name, modname)
     except Exception:
         pass
     try:
@@ -298,6 +304,17 @@ def get_symbols_in_expr(schema_expr: List[str]) -> Dict[str, Any]:
     return ldict
 
 
+def update_extra_modules(annotation: Any, extra_modules: Dict[str, Any]):
+    if type(annotation) in typing.__dict__.values():
+        if hasattr(annotation, "__args__"):
+            for i, x in enumerate(annotation.__args__):
+                update_extra_modules(x, extra_modules)
+    else:
+        modname = annotation.__module__
+        if modname in sys.modules and modname != "builtins":
+            extra_modules[modname] = sys.modules[modname]
+
+
 def get_schema_var(schemas: List[str], var: str,
                    func: Optional[Callable] = None) -> Type[BaseModel]:
     """Extract and return a `pydantic.BaseModel` from docstring.
@@ -312,6 +329,7 @@ def get_schema_var(schemas: List[str], var: str,
     """
     ldict: Dict[str, Any] = {}
     tfunc = None
+    extra_modules: Dict[str, Any] = {}
     for i, s in enumerate(schemas):
         if re.match(ref_regex, s):
             indent = [*filter(None, re.split(r'(\W+)', s))][0]
@@ -324,12 +342,18 @@ def get_schema_var(schemas: List[str], var: str,
                     tfunc = tfunc.fget
                 if trailing.strip(" ").startswith("return") and\
                    "return" in tfunc.__annotations__:
+                    annot_return = tfunc.__annotations__["return"]
+                    update_extra_modules(annot_return, extra_modules)
                     schemas[i] = indent + typename + ": " +\
                         str(tfunc.__annotations__["return"])
-            # except Exception as e:
-            #     print(f"Error {e} for {func} in get_schema_var")
-            #     schemas[i] = indent + typename + ": " + "Optional[Any]"
-    exec("\n".join(schemas), {**global_modules, **globals()}, ldict)
+    try:
+        exec("\n".join(schemas), {**extra_modules, **global_modules, **globals()}, ldict)
+    except Exception:
+        for x in extra_modules:
+            if x.split(".")[0] not in globals():
+                exec(f'import {x.split(".")[0]}')
+        # NOTE: the module will only be local
+        exec("\n".join(schemas), {**global_modules, **globals(), **locals()}, ldict)
     if var not in ldict:
         raise AttributeError(f"{var} not in docstring Schemas for {(tfunc or func)}")
     else:
@@ -416,8 +440,12 @@ def generate_responses(func: Callable, rulename: str, redirect: str) -> Dict[int
                             response.spec = schema
                         content = response.schema()
                     else:
-                        import ipdb; ipdb.set_trace()
-                        spec = get_schema_var(spec[1], var, func)
+                        redir_doc = docstring.GoogleDocstring(redir_func.__doc__)
+                        if not any(attr in s for s in redir_doc.schemas[1]):
+                            raise ValueError(f"{attr} not in {redir_func} spec: {redir_doc.schemas[1]}")
+                        spec = get_schema_var(redir_doc.schemas[1], attr, redir_func)
+                        schema = remove_description(spec.schema())
+                        content = response.schema(schema)
                 else:
                     var = sf.split(":")[-1].strip()
                     spec = get_schema_var(doc.schemas[1], var, func)
